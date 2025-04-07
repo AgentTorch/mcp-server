@@ -17,16 +17,6 @@ cd mcp-server
 
 ### Step 2: Set Up Environment Files
 Create an `.env` file in the project root with your Anthropic API key:
-```bash
-# Create .env file
-cat > .env << 'EOL'
-LLM_KEY=api_key
-
-
-PYTHONPATH=/app
-AGENTTORCH_CONFIG_PATH=/app/config.yaml
-EOL
-```
 
 ### Step 3: Launch with Docker Compose
 ```bash
@@ -77,7 +67,7 @@ cat > ~/.claude-desktop/config.json << 'EOL'
       "command": "docker",
       "args": [
         "exec",
-        "-it",
+        "-i",
         "agenttorch-mcp",
         "mcp",
         "run",
