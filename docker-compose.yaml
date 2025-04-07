@@ -1,0 +1,22 @@
+services:
+  agenttorch-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agenttorch-mcp
+    volumes:
+      # Mount your data and configuration files
+      - ./data:/app/data
+      - ./ui:/app/ui
+      - ./config.yaml:/app/config.yaml
+      - ./server.py:/app/server.py
+    ports:
+      # WebSocket port for UI communication
+      - "8765:8765"
+      # HTTP port for serving the UI
+      - "8080:8080"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - PYTHONPATH=/app
+      - AGENTTORCH_CONFIG_PATH=/app/config.yaml
+    restart: unless-stopped

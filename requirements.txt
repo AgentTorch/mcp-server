@@ -1,21 +1,20 @@
 # MCP dependencies
 mcp[cli]>=0.8.0
-fastapi-mcp
 
 # Web server
-fastapi
-uvicorn
+fastapi>=0.95.1
+uvicorn>=0.22.0
 jinja2==3.1.2
 python-multipart==0.0.6
 aiofiles==23.2.1
 websockets==11.0.3
 
 # API client
-anthropic
+anthropic>=0.5.0
 
 # Data handling
-pydantic
-scipy
+pydantic>=2.0.0
+scipy>=1.10.1
 numpy==1.24.3
 pandas==2.1.0
 matplotlib==3.7.2
@@ -24,13 +23,15 @@ matplotlib==3.7.2
 Pillow==10.0.0
 imageio==2.31.1
 
-# PyTorch
-torch>=2.1.2
-torchvision
+# PyTorch with CPU version (smaller image size)
+torch>=2.1.2 --index-url https://download.pytorch.org/whl/cpu
+torchvision>=0.16.2 --index-url https://download.pytorch.org/whl/cpu
 
-# Network visualization
+# Network visualization - using simpler alternatives where possible
 networkx==3.1
-osmnx==1.3.1
+# Use specific versions with binary wheels
+geopandas==0.13.2
+osmnx==1.5.1
 contextily==1.3.0
 
 # Utilities
@@ -38,8 +39,6 @@ python-dotenv==1.0.0
 requests==2.31.0
 pyyaml>=6.0
 tqdm>=4.65.0
-
-# Required for configuration handling (was missing)
 omegaconf>=2.1.1
 
 # AgentTorch from GitHub
