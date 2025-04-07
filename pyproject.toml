@@ -1,0 +1,74 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[project]
+name = "agent-torch-mcp-server"
+version = "0.1.0"
+description = "AgentTorch simulation server with Model Context Protocol (MCP) integration"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    {name = "AgentTorch Team"}
+]
+dependencies = [
+    # MCP
+    "mcp[cli]>=0.8.0",
+    "fastapi-mcp",
+    # Web server
+    "fastapi",
+    "uvicorn",
+    "jinja2==3.1.2",
+    "python-multipart==0.0.6",
+    "aiofiles==23.2.1",
+    "websockets==11.0.3",
+    # API client
+    "anthropic",
+    # Data handling
+    "pydantic",
+    "scipy",
+    "numpy==1.24.3",
+    "pandas==2.1.0",
+    "matplotlib==3.7.2",
+    # Visualization
+    "Pillow==10.0.0",
+    "imageio==2.31.1",
+    # PyTorch
+    "torch>=2.1.2",
+    "torchvision",
+    # Network visualization - explicitly include osmnx
+    "networkx==3.1",
+    "osmnx==1.3.1",
+    "contextily==1.3.0",
+    # Utilities
+    "python-dotenv==1.0.0",
+    "requests==2.31.0",
+    "pyyaml>=6.0",
+    "tqdm>=4.65.0",
+    # AgentTorch from GitHub
+    "agent_torch @ git+https://github.com/agenttorch/agenttorch",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["agent_torch_mcp"]
+
+[project.scripts]
+agent-torch-mcp = "agent_torch_mcp.server:main"
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
