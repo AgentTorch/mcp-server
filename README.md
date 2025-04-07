@@ -20,7 +20,9 @@ Create an `.env` file in the project root with your Anthropic API key:
 ```bash
 # Create .env file
 cat > .env << 'EOL'
-ANTHROPIC_API_KEY=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
+ANTHROPIC_API_KEY=api_key
+
+
 PYTHONPATH=/app
 AGENTTORCH_CONFIG_PATH=/app/config.yaml
 EOL
