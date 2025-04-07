@@ -1,125 +1,175 @@
-# AgentTorch MCP Server
+# Running the AgentTorch MCP Server
 
-## Overview
+This guide explains how to run the AgentTorch MCP server both locally and with Claude Desktop integration using Docker.
 
-AgentTorch MCP Server provides an interactive predator-prey simulation platform leveraging the Model Context Protocol (MCP) to create engaging ecological simulations. It connects AgentTorch's PyTorch-based simulations with Claude to deliver AI-powered analysis and visualization of complex ecosystem dynamics.
+## Option 1: Running Locally with Docker
 
-The platform enables users to run simulations, modify parameters through conversation, analyze results with AI insights, and visualize population trends.
+### Prerequisites
+- Docker installed on your machine
+- Docker Compose installed on your machine
+- Git installed on your machine
 
-## Features
-
-- **Interactive Simulation**: Configure and run ecological simulations with simple commands
-- **Substep Customization**: Modify movement, feeding, and hunting mechanics
-- **AI-Powered Analysis**: Get detailed ecological analysis of simulation results
-- **Web UI Integration**: View population trends and simulation logs visually
-- **Claude Desktop Integration**: Interact naturally using conversation
-
-## Prerequisites
-
-- Python 3.11+
-- uv (Python package installer)
-- Claude Desktop (for MCP integration)
-
-## Installation & Setup
-
-1. **Clone the repository**:
+### Step 1: Clone the Repository
 ```bash
 git clone https://github.com/AgentTorch/mcp-server
 cd mcp-server
 ```
 
-2. **Install MCP CLI**:
+### Step 2: Set Up Environment Files
+Create an `.env` file in the project root with your Anthropic API key:
 ```bash
-uv add "mcp[cli]"
+# Create .env file
+cat > .env << 'EOL'
+ANTHROPIC_API_KEY=api_key
+PYTHONPATH=/app
+AGENTTORCH_CONFIG_PATH=/app/config.yaml
+EOL
 ```
 
-3. **Setup the server in Claude Desktop**:
+### Step 3: Launch with Docker Compose
 ```bash
-mcp install server.py
+# Start the containers
+docker-compose up -d
+
+# Check if the containers are running
+docker-compose ps
+
+# View logs
+docker-compose logs -f
 ```
 
-4. **Run in development mode (for testing)**:
-```bash
-mcp dev server.py
+### Step 4: Access the Web UI
+Open your browser and go to:
+```
+http://localhost:8080
 ```
 
-## Usage
+### Step 5: Run the MCP Server Locally
+You can interact with the containerized MCP server using the following command:
+```bash
+# Execute the server directly in the container
+docker exec -it agenttorch-mcp mcp run server.py
+```
 
-### Using the Simulation
+## Option 2: Claude Desktop Integration
 
-1. **Start a New Conversation in Claude Desktop**:
-   - Select one of the available prompts:
-     - General Conversation
-     - Run Simulation
-     - Update Simulation Config
+### Step 1: Create Required Files
+Ensure you've completed Steps 1-3 from Option 1 above to get the Docker container running.
 
-2. **Run a Simulation**:
-   - Use the "Run Simulation" prompt
-   - Specify parameters like population sizes if desired
-   - View results in both Claude and the web UI
+### Step 2: Configure Claude Desktop
+Create or update Claude Desktop configuration:
 
-3. **Modify Simulation Parameters**:
-   - Use the specialized prompts to customize behavior
-   - Example: "Decrease predator energy cost to 0.5"
-   - Changes will be applied to the next simulation run
+1. Locate your Claude Desktop configuration directory:
+   - macOS: `~/.claude-desktop/`
+   - Windows: `%APPDATA%\claude-desktop\`
+   - Linux: `~/.config/claude-desktop/`
 
-4. **Analyze Results**:
-   - Review the AI-generated analysis
-   - Explore population trends in the web UI
+2. Create or edit the config.json file:
+```bash
+# For macOS/Linux
+mkdir -p ~/.claude-desktop
+cat > ~/.claude-desktop/config.json << 'EOL'
+{
+  "mcpServers": {
+    "AgentTorch Simulator": {
+      "command": "docker",
+      "args": [
+        "exec",
+        "-it",
+        "agenttorch-mcp",
+        "mcp",
+        "run",
+        "server.py"
+      ]
+    }
+  }
+}
+EOL
 
-### Accessing the Web UI
+# For Windows (using PowerShell)
+# New-Item -Path "$env:APPDATA\claude-desktop" -ItemType Directory -Force
+# Set-Content -Path "$env:APPDATA\claude-desktop\config.json" -Value '{
+#   "mcpServers": {
+#     "AgentTorch Simulator": {
+#       "command": "docker",
+#       "args": [
+#         "exec",
+#         "-it",
+#         "agenttorch-mcp",
+#         "mcp",
+#         "run",
+#         "server.py"
+#       ]
+#     }
+#   }
+# }'
+```
 
-The web UI is available at:
-- http://127.0.0.1:6274 (requires starting a simple HTTP server in the UI directory)
+### Step 3: Launch Claude Desktop
+1. Open Claude Desktop
+2. You should see "AgentTorch Simulator" in the server selection dropdown
+3. Select it to connect to your Docker container
 
-## Available Prompts
-
-1. **General Conversation**: Chat with the assistant
-2. **Run Simulation**: Execute the predator-prey simulation
-3. **Update Simulation Config**: Add food regeneration to the simulation
-
-## Simulation Parameters
-
-The simulation parameters are defined in `config.yaml`. Key parameters include:
-
-- Initial predator and prey populations
-- Number of episodes and steps
-- Energy costs for movement
-- Nutritional values for feeding and hunting
+### Step 4: Test Integration
+1. Start a new conversation in Claude Desktop
+2. Select one of the available prompts (e.g., "Run Simulation")
+3. Enter a query like "Run a simulation with 500 predators and 1000 prey"
+4. Check both Claude Desktop and the web UI (http://localhost:8080) for results
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **AgentTorch Import Errors**:
-   - Ensure all dependencies are properly installed
-   - Try reinstalling with `pip install git+https://github.com/agenttorch/agenttorch.git`
-
-2. **Claude Desktop Integration Issues**:
-   - Verify the MCP server is properly installed: `mcp list`
-   - Try reinstalling with `mcp install server.py`
-
-3. **Simulation Runtime Errors**:
-   - Check if data files exist in the expected locations
-   - Verify your config.yaml is properly formatted
-
-### Useful Commands
-
+### Docker Issues
 ```bash
-# List installed MCP servers
-mcp list
+# Restart the container
+docker-compose restart
 
-# Reinstall the server
-mcp install server.py
+# Rebuild the container (if you made changes)
+docker-compose down
+docker-compose up -d --build
 
-# Run with verbose logging
-mcp dev server.py --verbose
+# Check container logs
+docker-compose logs -f
 ```
 
-## License
+### Claude Desktop Connection Issues
+1. Verify Docker container is running:
+   ```bash
+   docker ps | grep agenttorch-mcp
+   ```
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+2. Check if the container can execute MCP commands:
+   ```bash
+   docker exec -it agenttorch-mcp mcp list
+   ```
 
+3. Restart Claude Desktop
 
+### Web UI Issues
+1. Check if the HTTP server is running:
+   ```bash
+   docker exec -it agenttorch-mcp curl http://localhost:8080
+   ```
 
-hiiiii
+2. Check port mappings:
+   ```bash
+   docker-compose ps
+   ```
+
+## Container Management Commands
+
+```bash
+# Stop the container
+docker-compose stop
+
+# Start the container
+docker-compose start
+
+# Remove the container (keeps your data)
+docker-compose down
+
+# Remove the container and volumes (deletes your data)
+docker-compose down -v
+
+# View container resource usage
+docker stats
+```
