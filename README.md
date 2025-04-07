@@ -75,7 +75,7 @@ cat > ~/.claude-desktop/config.json << 'EOL'
       "command": "docker",
       "args": [
         "exec",
-        "-it",
+        "-i",
         "agenttorch-mcp",
         "mcp",
         "run",
