@@ -20,7 +20,7 @@ Create an `.env` file in the project root with your Anthropic API key:
 ```bash
 # Create .env file
 cat > .env << 'EOL'
-ANTHROPIC_API_KEY=api_key
+LLM_KEY=api_key
 
 
 PYTHONPATH=/app
