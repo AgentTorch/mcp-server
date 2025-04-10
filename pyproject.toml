@@ -22,7 +22,7 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "jinja2==3.1.2",
-    "python-multipart==0.0.6",
+    "python-multipart==0.0.18",
     "aiofiles==23.2.1",
     "websockets==11.0.3",
     # API client
