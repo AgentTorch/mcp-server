@@ -54,21 +54,25 @@
 
             <!-- Tool buttons -->
             <div class="tools">
-                <button class="tool-button active" id="chat-btn">
-                    <i class="fa-solid fa-comment"></i>
-                    <span>Chat</span>
+                <button id="chat-btn" class="tool-button active">
+                    <i class="fas fa-comment"></i> Chat
                 </button>
-                <button class="tool-button" id="run-sim-btn">
-                    <i class="fa-solid fa-play"></i>
-                    <span>Run Simulation</span>
+                <button id="run-sim-btn" class="tool-button">
+                    <i class="fas fa-play"></i> Run Simulation
                 </button>
-                <button class="tool-button" id="update-config-btn">
-                    <i class="fa-solid fa-gear"></i>
-                    <span>Update Config</span>
+                <button id="update-config-btn" class="tool-button">
+                    <i class="fas fa-cog"></i> Update Config
                 </button>
-                <button class="tool-button" id="analyze-btn">
-                    <i class="fa-solid fa-chart-line"></i>
-                    <span>Analyze</span>
+                <button id="analyze-btn" class="tool-button">
+                    <i class="fas fa-chart-line"></i> Analyze
+                </button>
+            </div>
+            
+            <!-- Update the run button to have a more prominent appearance -->
+            <div class="input-buttons">
+                <button id="run-button" type="button">
+                    <span id="run-loader" class="loader hidden"></span>
+                    <span class="button-text">Run</span>
                 </button>
             </div>
 

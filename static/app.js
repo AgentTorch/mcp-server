@@ -52,7 +52,7 @@ function initializeWebSocket() {
     socket.onclose = () => {
         console.log('WebSocket connection closed');
         appendLog('Connection to server closed. Attempting to reconnect...', 'text-warning');
-        appendSystemMessage('Connection to server lost. Attempting to reconnect...');
+        appendSystemMessage('Connection to server lost. Attempting to reconnect...', 'small');
         disableUI();
         
         // Try to reconnect after 3 seconds
@@ -62,7 +62,7 @@ function initializeWebSocket() {
     socket.onerror = (error) => {
         console.error('WebSocket error:', error);
         appendLog('WebSocket error: Connection failed', 'text-danger');
-        appendSystemMessage('Error connecting to the simulation server.');
+        appendSystemMessage('Error connecting to the simulation server.', 'small');
     };
     
     return socket;
@@ -107,14 +107,14 @@ function handleWebSocketMessage(message) {
             
         case 'error':
             appendLog('ERROR: ' + (message.message || 'Unknown error'), 'text-danger');
-            appendSystemMessage('Error: ' + (message.message || 'Unknown error'));
+            appendSystemMessage('Error: ' + (message.message || 'Unknown error'), 'small');
             hideRunLoader();
             enableUI();
             break;
             
         default:
             console.warn('Unknown message type:', message.type);
-            appendSystemMessage(`Received unknown message type: ${message.type}`);
+            appendSystemMessage(`Received unknown message type: ${message.type}`, 'small');
             enableUI();
     }
 }
@@ -148,10 +148,12 @@ function disableUI() {
 
 function showRunLoader() {
     runLoader.classList.remove('hidden');
+    runButton.classList.add('running');
 }
 
 function hideRunLoader() {
     runLoader.classList.add('hidden');
+    runButton.classList.remove('running');
 }
 
 function updateProgressBar(percentage) {
@@ -210,16 +212,16 @@ function appendAssistantMessage(message, chartData = null) {
     if (chartData && typeof Chart !== 'undefined') {
         try {
             const chartContainer = document.createElement('div');
-            chartContainer.className = 'chart-container';
+            chartContainer.className = 'chart-container full-width';
             chartContainer.style.width = '100%';
-            chartContainer.style.height = '300px';
+            chartContainer.style.height = '380px';
             chartContainer.style.marginTop = '20px';
             
             const canvas = document.createElement('canvas');
             chartContainer.appendChild(canvas);
-            messageDiv.appendChild(chartContainer);
+            contentDiv.appendChild(chartContainer); // Append to content div instead of message div
             
-            // Create chart
+            // Create chart with interactive options
             const ctx = canvas.getContext('2d');
             new Chart(ctx, {
                 type: 'line',
@@ -227,9 +229,67 @@ function appendAssistantMessage(message, chartData = null) {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        tooltip: {
+                            enabled: true,
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleFont: {
+                                size: 14,
+                            },
+                            bodyFont: {
+                                size: 13
+                            },
+                            padding: 10,
+                            displayColors: true,
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.dataset.label || '';
+                                    const value = context.parsed.y;
+                                    return `${label}: ${value}`;
+                                }
+                            }
+                        },
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 14
+                                },
+                                padding: 15
+                            }
+                        }
+                    },
                     scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Simulation Steps',
+                                font: {
+                                    size: 14
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            }
+                        },
                         y: {
-                            beginAtZero: true
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Population Count',
+                                font: {
+                                    size: 14
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            }
                         }
                     }
                 }
@@ -240,7 +300,7 @@ function appendAssistantMessage(message, chartData = null) {
             const errorDiv = document.createElement('div');
             errorDiv.className = 'chart-error';
             errorDiv.textContent = 'Error displaying chart. Check console for details.';
-            messageDiv.appendChild(errorDiv);
+            contentDiv.appendChild(errorDiv);
         }
     }
     
@@ -248,9 +308,9 @@ function appendAssistantMessage(message, chartData = null) {
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
-function appendSystemMessage(message) {
+function appendSystemMessage(message, size = '') {
     const systemMessage = document.createElement('div');
-    systemMessage.className = 'system-message';
+    systemMessage.className = `system-message ${size}`;
     systemMessage.textContent = message;
     
     chatContainer.appendChild(systemMessage);
@@ -276,7 +336,7 @@ function formatMessageText(text) {
 // Auto-resize textarea
 function autoResizeTextarea() {
     promptInput.style.height = 'auto';
-    promptInput.style.height = (promptInput.scrollHeight) + 'px';
+    promptInput.style.height = Math.min(200, (promptInput.scrollHeight)) + 'px';
 }
 
 // Run Simulation
@@ -284,7 +344,7 @@ function runSimulation() {
     const prompt = promptInput.value.trim();
     
     if (prompt === '') {
-        appendSystemMessage('Please enter a prompt or select a sample prompt.');
+        appendSystemMessage('Please enter a prompt or select a sample prompt.', 'small');
         return;
     }
     
@@ -316,13 +376,13 @@ function runSimulation() {
     // Add user message to chat
     appendUserMessage(prompt);
     
-    // Show appropriate system message
+    // Show appropriate system message with small size
     if (command === 'update_config') {
-        appendSystemMessage('Updating simulation configuration...');
+        appendSystemMessage('Updating simulation configuration...', 'small');
     } else if (command === 'run_simulation') {
-        appendSystemMessage('Starting simulation based on your query...');
+        appendSystemMessage('Starting simulation based on your query...', 'small');
     } else {
-        appendSystemMessage('Processing your request...');
+        appendSystemMessage('Processing your request...', 'small');
     }
     
     // Disable UI and show loader
@@ -342,6 +402,10 @@ function runSimulation() {
         command: command,
         prompt: prompt
     }));
+    
+    // Clear input after sending
+    promptInput.value = '';
+    autoResizeTextarea();
 }
 
 // Event Handlers
@@ -399,6 +463,9 @@ function initialize() {
     
     // Focus on input
     promptInput.focus();
+    
+    // Set initial height for input
+    autoResizeTextarea();
 }
 
 // Start on page load

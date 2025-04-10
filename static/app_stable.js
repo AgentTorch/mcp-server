@@ -44,8 +44,8 @@ function initializeWebSocket() {
             const message = JSON.parse(event.data);
             handleWebSocketMessage(message);
         } catch (error) {
-            console.error('Error parsing message:', error);
-            appendLog('Error processing server message', 'text-danger');
+            console.error('Error parsing message:', error, event.data);
+            appendLog('Error processing server message: ' + error.message, 'text-danger');
         }
     };
     
@@ -72,38 +72,50 @@ function initializeWebSocket() {
 function handleWebSocketMessage(message) {
     console.log('Received message:', message);
     
+    // Process based on message type
     switch(message.type) {
+        case 'connection_established':
+            console.log('Connection established:', message.message);
+            break;
+            
         case 'simulation_log':
-            appendLog(message.log);
+            appendLog(message.log || '');
             updateProgressBar(message.progress || 0);
             updateStatusDisplay(`Running simulation: ${message.progress || 0}%`);
             showSidePanel();
             break;
             
         case 'simulation_complete':
-            // Update UI
             hideRunLoader();
             appendLog('Simulation completed successfully!', 'text-success');
-            updateStatusDisplay('Simulation completed. Analyzing results...');
-            showSidePanel();
+            updateStatusDisplay('Simulation completed.');
+            updateProgressBar(100);
             break;
             
         case 'analysis_result':
-            // Display analysis in the chat
-            appendAssistantMessage(message.analysis);
+            // Pass both analysis text and chart data
+            appendAssistantMessage(message.analysis, message.chartData);
             enableUI();
             updateStatusDisplay('Analysis completed.');
             break;
             
+        case 'config_updated':
+            appendAssistantMessage(message.message || '');
+            enableUI();
+            updateStatusDisplay('Configuration updated.');
+            break;
+            
         case 'error':
-            appendLog('ERROR: ' + message.message, 'text-danger');
-            appendSystemMessage('Error: ' + message.message);
+            appendLog('ERROR: ' + (message.message || 'Unknown error'), 'text-danger');
+            appendSystemMessage('Error: ' + (message.message || 'Unknown error'));
             hideRunLoader();
             enableUI();
             break;
             
         default:
             console.warn('Unknown message type:', message.type);
+            appendSystemMessage(`Received unknown message type: ${message.type}`);
+            enableUI();
     }
 }
 
@@ -184,7 +196,7 @@ function appendUserMessage(message) {
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
-function appendAssistantMessage(message) {
+function appendAssistantMessage(message, chartData = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = 'chat-message assistant-message';
     
@@ -193,6 +205,45 @@ function appendAssistantMessage(message) {
     contentDiv.innerHTML = formatMessageText(message);
     
     messageDiv.appendChild(contentDiv);
+    
+    // Only try to create chart if chartData is provided and Chart.js is available
+    if (chartData && typeof Chart !== 'undefined') {
+        try {
+            const chartContainer = document.createElement('div');
+            chartContainer.className = 'chart-container';
+            chartContainer.style.width = '100%';
+            chartContainer.style.height = '300px';
+            chartContainer.style.marginTop = '20px';
+            
+            const canvas = document.createElement('canvas');
+            chartContainer.appendChild(canvas);
+            messageDiv.appendChild(chartContainer);
+            
+            // Create chart
+            const ctx = canvas.getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error creating chart:', error);
+            // Add an error message to the chat
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'chart-error';
+            errorDiv.textContent = 'Error displaying chart. Check console for details.';
+            messageDiv.appendChild(errorDiv);
+        }
+    }
+    
     chatContainer.appendChild(messageDiv);
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }
@@ -207,6 +258,11 @@ function appendSystemMessage(message) {
 }
 
 function formatMessageText(text) {
+    // Handle non-string inputs
+    if (typeof text !== 'string') {
+        text = String(text || '');
+    }
+    
     // Escape HTML
     let escapedText = text
         .replace(/&/g, '&amp;')
@@ -232,46 +288,54 @@ function runSimulation() {
         return;
     }
     
-    // Get current tool
-  // Get current tool
+    // Get active tool ID
     const activeTool = document.querySelector('.tool-button.active');
-    const toolId = activeTool ? activeTool.id.replace('-btn', '') : 'chat';
-
-    // Map tool IDs to the correct command
+    const toolId = activeTool ? activeTool.id : 'chat-btn';
+    
+    // Map tool buttons to commands
     let command;
     switch (toolId) {
-        case 'chat':
+        case 'chat-btn':
             command = 'chat';
             break;
-        case 'run-sim':
+        case 'run-sim-btn':
             command = 'run_simulation';
             break;
-        case 'update-config':
+        case 'update-config-btn':
             command = 'update_config';
             break;
-        case 'analyze':
+        case 'analyze-btn':
             command = 'analyze_simulation';
             break;
         default:
             command = 'chat';
     }
     
+    console.log(`Sending command: ${command} with prompt: ${prompt.substring(0, 50)}...`);
+    
     // Add user message to chat
     appendUserMessage(prompt);
     
-    // Show system message
-    appendSystemMessage('Starting simulation based on your query...');
+    // Show appropriate system message
+    if (command === 'update_config') {
+        appendSystemMessage('Updating simulation configuration...');
+    } else if (command === 'run_simulation') {
+        appendSystemMessage('Starting simulation based on your query...');
+    } else {
+        appendSystemMessage('Processing your request...');
+    }
     
     // Disable UI and show loader
     disableUI();
     
-    // Clear logs
-    logConsole.innerHTML = '';
-    appendLog('Starting simulation...', 'text-info');
-    
-    // Update status
-    updateStatusDisplay('Starting simulation...');
-    updateProgressBar(0);
+    // Clear logs if running simulation
+    if (command === 'run_simulation') {
+        logConsole.innerHTML = '';
+        appendLog('Starting simulation...', 'text-info');
+        updateStatusDisplay('Starting simulation...');
+        updateProgressBar(0);
+        showSidePanel();
+    }
     
     // Send request to server
     window.socket.send(JSON.stringify({
