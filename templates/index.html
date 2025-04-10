@@ -3,482 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AgentTorch Predator-Prey Simulation</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Large Population Model</title>
     <link rel="stylesheet" href="/static/styles.css">
-    <style>
-        /* Additional styles for improved prompt area */
-        .prompt-area {
-            width: 100%;
-        }
-
-        .prompt-input {
-            min-height: 100px;
-            transition: height 0.2s;
-            resize: vertical;
-        }
-
-        .card-body {
-            padding: 1.25rem;
-        }
-
-        /* Improved chat container to show more content */
-        .chat-container {
-            height: 450px;
-        }
-
-        /* Make columns more responsive */
-        @media (min-width: 992px) {
-            .col-lg-9 {
-                flex: 0 0 auto;
-                width: 75%;
-            }
-            .col-lg-3 {
-                flex: 0 0 auto;
-                width: 25%;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 </head>
-<body>
-    <div class="header text-center">
-        <h1>AgentTorch Predator-Prey Simulation</h1>
-        <p class="lead">Multi-agent ecosystem simulation with LLM analysis</p>
-    </div>
-    
-    <div class="container-fluid px-4">
-        <div class="row">
-            <!-- Increased column width from col-lg-8 to col-lg-9 -->
-            <div class="col-lg-9">
-                <!-- Chat-like interface -->
-                <div class="card mb-4">
-                    <div class="card-header">Simulation Conversation</div>
-                    <div class="card-body p-0">
-                        <div id="chat-container" class="chat-container">
-                            <div class="system-message">Start by entering your question or selecting a sample prompt below.</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Input area with improved sizing -->
-                <div class="card mb-4">
-                    <div class="card-header">Ask about the simulation</div>
-                    <div class="card-body">
-                        <!-- Increased rows from 3 to 5 -->
-                        <textarea id="prompt-input" class="form-control prompt-input" rows="5" placeholder="What would happen in a predator-prey ecosystem if..."></textarea>
-                        <div class="d-flex justify-content-between mt-3">
-                            <button id="run-button" class="btn btn-primary">
-                                <span>Run Simulation & Analyze</span>
-                                <div id="run-loader" class="loader hidden"></div>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Sample prompts -->
-                <div class="card mb-4">
-                    <div class="card-header">Sample Prompts</div>
-                    <div class="card-body">
-                        <p>Click on any prompt to use it:</p>
-                        <div class="sample-prompts">
-                            <div class="sample-prompt">What happens to prey population when predators increase?</div>
-                            <div class="sample-prompt">How does the availability of food affect the predator-prey dynamics?</div>
-                            <div class="sample-prompt">What emergent behaviors appear in this ecosystem?</div>
-                            <div class="sample-prompt">Analyze the oscillations in population levels over time</div>
-                            <div class="sample-prompt">What would happen if the nutritional value of grass was doubled?</div>
-                        </div>
-                    </div>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Header with theme toggle -->
+        <header class="header">
+            <div class="logo">
+                <span>Large Population Model</span>
+            </div>
+            <div class="header-controls">
+                <button id="theme-toggle" class="theme-toggle">
+                    <i class="fa-solid fa-sun light-icon"></i>
+                    <i class="fa-solid fa-moon dark-icon"></i>
+                </button>
+                <div class="user-profile">
+                    <img src="https://via.placeholder.com/32" alt="User profile">
                 </div>
             </div>
-            
-            <!-- Decreased from col-lg-4 to col-lg-3 -->
-            <div class="col-lg-3">
-                <!-- Simulation status -->
-                <div class="card mb-4">
-                    <div class="card-header">Simulation Status</div>
-                    <div class="card-body">
-                        <div id="status-display">
-                            <p class="text-muted">No simulation has been run yet.</p>
-                        </div>
-                        <div class="progress mt-3">
-                            <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-                        </div>
-                    </div>
+        </header>
+
+        <!-- Main content -->
+        <div class="main-content">
+            <!-- Welcome message -->
+            <div class="welcome-message">
+                <h1>Welcome to Large Population Model</h1>
+                <p>Imagine if your agent could simulate a million agents</p>
+            </div>
+
+            <!-- Chat area -->
+            <div class="chat-container" id="chat-container">
+                <div class="system-message">
+                    Start by entering your question or selecting a sample prompt below.
                 </div>
-                
-                <!-- Simulation logs -->
-                <div class="card mb-4">
-                    <div class="card-header">Simulation Logs</div>
-                    <div class="card-body p-0">
-                        <div id="log-console" class="log-console">
-                            <p class="text-muted">Simulation logs will appear here...</p>
-                        </div>
+            </div>
+
+            <!-- Input area -->
+            <div class="input-area">
+                <textarea id="prompt-input" class="prompt-input" placeholder="What would you like to simulate today?" rows="1"></textarea>
+                <div class="input-buttons">
+                    <button id="run-button" class="run-button">
+                        <span>Run</span>
+                        <div class="loader hidden" id="run-loader"></div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tool buttons -->
+            <div class="tools">
+                <button class="tool-button active" id="chat-btn">
+                    <i class="fa-solid fa-comment"></i>
+                    <span>Chat</span>
+                </button>
+                <button class="tool-button" id="run-sim-btn">
+                    <i class="fa-solid fa-play"></i>
+                    <span>Run Simulation</span>
+                </button>
+                <button class="tool-button" id="update-config-btn">
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Update Config</span>
+                </button>
+                <button class="tool-button" id="analyze-btn">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Analyze</span>
+                </button>
+            </div>
+
+            <!-- Sample prompts -->
+            <!-- <div class="sample-prompts">
+                <div class="sample-prompt">What happens to prey population when predators increase?</div>
+                <div class="sample-prompt">How does food availability affect the ecosystem balance?</div>
+                <div class="sample-prompt">What emergent behaviors appear in predator-prey systems?</div>
+                <div class="sample-prompt">Analyze the oscillations in population levels over time</div>
+                <div class="sample-prompt">What would happen if the environment capacity was reduced?</div>
+            </div> -->
+            
+            <!-- Features section -->
+            <div class="features-section">
+                <h2>Key Features</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <i class="fa-solid fa-users"></i>
+                        <h3>Agent-Based Modeling</h3>
+                        <p>Simulate complex interactions between millions of autonomous agents</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fa-solid fa-brain"></i>
+                        <h3>AI-Driven Analysis</h3>
+                        <p>Advanced AI interprets simulation results and emergent behaviors</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fa-solid fa-chart-line"></i>
+                        <h3>Real-time Visualization</h3>
+                        <p>Track system dynamics and population statistics in real-time</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fa-solid fa-sliders"></i>
+                        <h3>Parameter Control</h3>
+                        <p>Adjust ecosystem parameters to test different scenarios</p>
                     </div>
                 </div>
             </div>
         </div>
-        
-        <!-- Population dynamics chart -->
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">Population Dynamics</div>
-                    <div class="card-body p-0">
-                        <div class="chart-container">
-                            <canvas id="population-chart"></canvas>
-                        </div>
-                    </div>
+
+        <!-- Side panel (Now with expanded logs) -->
+        <div class="side-panel" id="side-panel">
+            <div class="panel-header">
+                <h3>Simulation Details</h3>
+                <button id="close-panel" class="close-panel">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Status section -->
+            <div class="panel-section">
+                <h4>Status</h4>
+                <div id="status-display">
+                    <p class="text-muted">No simulation has been run yet.</p>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-bar" id="progress-bar" style="width: 0%;">0%</div>
+                </div>
+            </div>
+
+            <!-- Expanded Logs section -->
+            <div class="panel-section logs-section">
+                <h4>Simulation Logs</h4>
+                <div id="log-console" class="log-console">
+                    <p class="text-muted">Simulation logs will appear here...</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <script>
-        // Global variables
-        let socket;
-        let simChart;
-        let simResults = null;
-        let simLogs = [];
-        let simulationInProgress = false;
-        
-        // DOM elements
-        const runButton = document.getElementById('run-button');
-        const runLoader = document.getElementById('run-loader');
-        const progressBar = document.getElementById('progress-bar');
-        const logConsole = document.getElementById('log-console');
-        const promptInput = document.getElementById('prompt-input');
-        const statusDisplay = document.getElementById('status-display');
-        const populationChart = document.getElementById('population-chart');
-        const chatContainer = document.getElementById('chat-container');
-        const samplePrompts = document.querySelectorAll('.sample-prompt');
-        
-        // Auto-resize textarea based on content
-        promptInput.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = (this.scrollHeight) + 'px';
-        });
-        
-        // Initialize WebSocket
-        function initializeWebSocket() {
-            // Get the correct WebSocket URL based on current protocol
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws`;
-            
-            console.log(`Connecting to WebSocket at ${wsUrl}`);
-            socket = new WebSocket(wsUrl);
-            
-            socket.onopen = function(e) {
-                console.log('WebSocket connection established');
-                appendLog('Connected to simulation server', 'text-success');
-                enableRunButton();
-            };
-            
-            socket.onmessage = function(event) {
-                const message = JSON.parse(event.data);
-                handleWebSocketMessage(message);
-            };
-            
-            socket.onclose = function(event) {
-                console.log('WebSocket connection closed');
-                appendLog('Connection to server closed. Refresh page to reconnect.', 'text-danger');
-                appendSystemMessage('Connection to server lost. Please refresh the page.');
-                disableRunButton();
-                // Try to reconnect after 5 seconds
-                setTimeout(initializeWebSocket, 5000);
-            };
-            
-            socket.onerror = function(error) {
-                console.error('WebSocket error:', error);
-                appendLog('WebSocket error: ' + error.message, 'text-danger');
-                appendSystemMessage('Error connecting to the simulation server.');
-            };
-        }
-        
-        // Handle incoming WebSocket messages
-        function handleWebSocketMessage(message) {
-            console.log('Received message:', message);
-            
-            switch(message.type) {
-                case 'simulation_log':
-                    appendLog(message.log);
-                    updateProgressBar(message.progress);
-                    simLogs.push(message.log);
-                    updateStatusDisplay(`Running simulation: ${message.progress}%`);
-                    break;
-                    
-                case 'simulation_complete':
-                    // Save simulation results
-                    simResults = message.stats;
-                    console.log("Received simulation results:", simResults);
-                    
-                    // Create or update the chart
-                    createPopulationChart(message.chartData);
-                    
-                    // Hide run loader
-                    hideRunLoader();
-                    
-                    appendLog('Simulation completed successfully!', 'text-success');
-                    updateStatusDisplay('Simulation completed. Analyzing results...');
-                    
-                    // Now request analysis - this happens automatically
-                    requestAnalysis();
-                    break;
-                    
-                case 'analysis_result':
-                    // Display analysis in the chat
-                    appendAssistantMessage(message.analysis);
-                    
-                    // Reset state
-                    simulationInProgress = false;
-                    enableRunButton();
-                    updateStatusDisplay('Analysis completed.');
-                    break;
-                    
-                case 'error':
-                    appendLog('ERROR: ' + message.message, 'text-danger');
-                    appendSystemMessage('Error: ' + message.message);
-                    hideRunLoader();
-                    enableRunButton();
-                    simulationInProgress = false;
-                    updateStatusDisplay('Error occurred. Please try again.');
-                    break;
-                    
-                default:
-                    console.warn('Unknown message type:', message.type);
-            }
-        }
-        
-        // UI Control Functions
-        function enableRunButton() {
-            runButton.disabled = false;
-            hideRunLoader();
-        }
-        
-        function disableRunButton() {
-            runButton.disabled = true;
-            showRunLoader();
-        }
-        
-        function showRunLoader() {
-            runLoader.classList.remove('hidden');
-        }
-        
-        function hideRunLoader() {
-            runLoader.classList.add('hidden');
-        }
-        
-        function updateProgressBar(percentage) {
-            progressBar.style.width = `${percentage}%`;
-            progressBar.setAttribute('aria-valuenow', percentage);
-            progressBar.textContent = `${percentage}%`;
-        }
-        
-        function updateStatusDisplay(message) {
-            statusDisplay.innerHTML = `<p>${message}</p>`;
-        }
-        
-        function clearLogs() {
-            logConsole.innerHTML = '';
-            simLogs = [];
-        }
-        
-        function appendLog(message, className = '') {
-            const logEntry = document.createElement('p');
-            if (className) {
-                logEntry.className = className;
-            }
-            logEntry.textContent = message;
-            logConsole.appendChild(logEntry);
-            
-            // Auto-scroll to the bottom
-            logConsole.scrollTop = logConsole.scrollHeight;
-        }
-        
-        // Chat interface functions
-        function appendUserMessage(message) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'chat-message user-message';
-            messageDiv.textContent = message;
-            chatContainer.appendChild(messageDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-        
-        function appendAssistantMessage(message) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'chat-message assistant-message';
-            messageDiv.innerHTML = message.replace(/\n/g, '<br>');
-            chatContainer.appendChild(messageDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-        
-        function appendSystemMessage(message) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'system-message';
-            messageDiv.textContent = message;
-            chatContainer.appendChild(messageDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-        
-        // Chart Creation
-        function createPopulationChart(chartData) {
-            // Configure Chart.js default colors for dark mode
-            Chart.defaults.color = '#e0e0e0';
-            Chart.defaults.borderColor = '#444';
-            
-            // Destroy existing chart if it exists
-            if (simChart) {
-                simChart.destroy();
-            }
-            
-            // Create new chart
-            const ctx = populationChart.getContext('2d');
-            simChart = new Chart(ctx, {
-                type: 'line',
-                data: chartData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Population Count'
-                            },
-                            grid: {
-                                color: '#333'
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Simulation Step'
-                            },
-                            grid: {
-                                color: '#333'
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                            labels: {
-                                color: '#e0e0e0'
-                            }
-                        },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false,
-                            backgroundColor: '#252525',
-                            titleColor: '#e0e0e0',
-                            bodyColor: '#e0e0e0',
-                            borderColor: '#444',
-                            borderWidth: 1
-                        }
-                    }
-                }
-            });
-        }
-        
-        // Event Handlers
-        function runSimulation() {
-            const prompt = promptInput.value.trim();
-            
-            if (prompt === '') {
-                alert('Please enter a prompt or select a sample prompt before running the simulation.');
-                return;
-            }
-            
-            if (!socket || socket.readyState !== WebSocket.OPEN) {
-                alert('WebSocket connection not available. Please refresh the page.');
-                return;
-            }
-            
-            if (simulationInProgress) {
-                alert('A simulation is already in progress. Please wait for it to complete.');
-                return;
-            }
-            
-            // Set the simulation in progress flag
-            simulationInProgress = true;
-            
-            // Add user message to chat
-            appendUserMessage(prompt);
-            
-            // Append system message about starting simulation
-            appendSystemMessage('Starting simulation based on your query...');
-            
-            // Clear previous logs and results
-            clearLogs();
-            simResults = null;
-            updateProgressBar(0);
-            
-            // Disable run button and show loader
-            disableRunButton();
-            
-            // Clear previous chart
-            if (simChart) {
-                simChart.destroy();
-                simChart = null;
-            }
-            
-            // Update status
-            updateStatusDisplay('Starting simulation...');
-            
-            // Send run command
-            socket.send(JSON.stringify({
-                command: 'run_simulation',
-                prompt: prompt
-            }));
-            
-            appendLog('Starting simulation...', 'text-info');
-        }
-        
-        function requestAnalysis() {
-            if (!socket || socket.readyState !== WebSocket.OPEN) {
-                alert('WebSocket connection not available. Please refresh the page.');
-                return;
-            }
-            
-            if (!simResults) {
-                alert('No simulation results available. Please run a simulation first.');
-                return;
-            }
-            
-            // Get prompt
-            const prompt = promptInput.value.trim() || 'What patterns do you observe in the predator-prey dynamics?';
-            
-            // Show analyzing message in chat
-            appendSystemMessage('Analyzing simulation results...');
-            
-            console.log("Sending analysis request with results:", simResults);
-            
-            // Send analyze command
-            socket.send(JSON.stringify({
-                command: 'analyze',
-                prompt: prompt,
-                results: simResults,
-                logs: simLogs
-            }));
-        }
-        
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            // Connect to WebSocket
-            initializeWebSocket();
-            
-            // Set up event listeners
-            runButton.addEventListener('click', runSimulation);
-            
-            // Set up sample prompt listeners
-            samplePrompts.forEach(prompt => {
-                prompt.addEventListener('click', function() {
-                    promptInput.value = this.textContent;
-                    promptInput.focus();
-                });
-            });
-        });
-    </script>
+    <script src="/static/app.js"></script>
 </body>
 </html>

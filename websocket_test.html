@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .control-panel {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .connected {
+            background-color: #d4f7d4;
+            color: #006400;
+        }
+        .disconnected {
+            background-color: #ffdddd;
+            color: #cc0000;
+        }
+        .log-container {
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 5px;
+            height: 400px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+        }
+        .received {
+            color: #006400;
+        }
+        .sent {
+            color: #0000cc;
+        }
+        .error {
+            color: #cc0000;
+        }
+        input, button {
+            padding: 8px;
+        }
+        input {
+            flex-grow: 1;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Test Client</h1>
+    <div class="container">
+        <div class="control-panel">
+            <input type="text" id="server-url" value="ws://localhost:8080/ws_test" placeholder="WebSocket server URL">
+            <button id="connect-btn">Connect</button>
+            <button id="disconnect-btn" disabled>Disconnect</button>
+            <div id="status" class="status disconnected">Disconnected</div>
+        </div>
+        
+        <div class="control-panel">
+            <input type="text" id="message-input" placeholder="Enter message to send" disabled>
+            <button id="send-btn" disabled>Send</button>
+        </div>
+        
+        <div>
+            <h3>Connection Log</h3>
+            <div id="log" class="log-container"></div>
+        </div>
+        
+        <div>
+            <h3>Test Commands</h3>
+            <button id="test-sim-btn">Test Run Simulation</button>
+            <button id="test-analyze-btn">Test Analyze</button>
+            <button id="test-update-btn">Test Update Config</button>
+        </div>
+    </div>
+    
+    <script>
+        // DOM elements
+        const serverUrlInput = document.getElementById('server-url');
+        const connectBtn = document.getElementById('connect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const statusDiv = document.getElementById('status');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        const logDiv = document.getElementById('log');
+        const testSimBtn = document.getElementById('test-sim-btn');
+        const testAnalyzeBtn = document.getElementById('test-analyze-btn');
+        const testUpdateBtn = document.getElementById('test-update-btn');
+        
+        // WebSocket connection
+        let socket = null;
+        
+        // Connect to WebSocket server
+        function connect() {
+            const url = serverUrlInput.value.trim();
+            if (!url) {
+                logMessage('Please enter a server URL', 'error');
+                return;
+            }
+            
+            try {
+                socket = new WebSocket(url);
+                
+                socket.onopen = () => {
+                    logMessage('Connected to server', 'info');
+                    statusDiv.textContent = 'Connected';
+                    statusDiv.className = 'status connected';
+                    
+                    // Update UI
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    messageInput.disabled = false;
+                    sendBtn.disabled = false;
+                    testSimBtn.disabled = false;
+                    testAnalyzeBtn.disabled = false;
+                    testUpdateBtn.disabled = false;
+                };
+                
+                socket.onmessage = (event) => {
+                    logMessage(`Received: ${event.data}`, 'received');
+                };
+                
+                socket.onclose = () => {
+                    logMessage('Disconnected from server', 'info');
+                    statusDiv.textContent = 'Disconnected';
+                    statusDiv.className = 'status disconnected';
+                    
+                    // Update UI
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    messageInput.disabled = true;
+                    sendBtn.disabled = true;
+                    testSimBtn.disabled = true;
+                    testAnalyzeBtn.disabled = true;
+                    testUpdateBtn.disabled = true;
+                    
+                    socket = null;
+                };
+                
+                socket.onerror = (error) => {
+                    logMessage(`Error: ${error.message || 'Unknown error'}`, 'error');
+                };
+                
+            } catch (error) {
+                logMessage(`Connection error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Disconnect from server
+        function disconnect() {
+            if (socket) {
+                socket.close();
+            }
+        }
+        
+        // Send message to server
+        function sendMessage() {
+            if (!socket) {
+                logMessage('Not connected to a server', 'error');
+                return;
+            }
+            
+            const message = messageInput.value.trim();
+            if (!message) {
+                logMessage('Please enter a message to send', 'error');
+                return;
+            }
+            
+            try {
+                socket.send(message);
+                logMessage(`Sent: ${message}`, 'sent');
+                messageInput.value = '';
+            } catch (error) {
+                logMessage(`Send error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Send test simulation command
+        function sendTestSimulation() {
+            if (!socket) {
+                logMessage('Not connected to a server', 'error');
+                return;
+            }
+            
+            const command = {
+                command: 'run_simulation',
+                prompt: 'Test simulation with 50 predators and 200 prey'
+            };
+            
+            try {
+                const message = JSON.stringify(command);
+                socket.send(message);
+                logMessage(`Sent test simulation command: ${message}`, 'sent');
+            } catch (error) {
+                logMessage(`Send error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Send test analyze command
+        function sendTestAnalyze() {
+            if (!socket) {
+                logMessage('Not connected to a server', 'error');
+                return;
+            }
+            
+            const command = {
+                command: 'analyze',
+                prompt: 'Analyze the impact of predator numbers on prey population'
+            };
+            
+            try {
+                const message = JSON.stringify(command);
+                socket.send(message);
+                logMessage(`Sent test analyze command: ${message}`, 'sent');
+            } catch (error) {
+                logMessage(`Send error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Send test update config command
+        function sendTestUpdateConfig() {
+            if (!socket) {
+                logMessage('Not connected to a server', 'error');
+                return;
+            }
+            
+            const command = {
+                command: 'update_config',
+                prompt: 'Update simulation to add food regeneration'
+            };
+            
+            try {
+                const message = JSON.stringify(command);
+                socket.send(message);
+                logMessage(`Sent test update config command: ${message}`, 'sent');
+            } catch (error) {
+                logMessage(`Send error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Log message to the log container
+        function logMessage(message, type) {
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        // Event listeners
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        testSimBtn.addEventListener('click', sendTestSimulation);
+        testAnalyzeBtn.addEventListener('click', sendTestAnalyze);
+        testUpdateBtn.addEventListener('click', sendTestUpdateConfig);
+        
+        // Switch to main WebSocket
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const endpoint = urlParams.get('endpoint');
+            if (endpoint === 'main') {
+                serverUrlInput.value = 'ws://localhost:8080/ws';
+                logMessage('Set to use main WebSocket endpoint', 'info');
+            }
+        });
+    </script>
+</body>
+</html>

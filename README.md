@@ -1,175 +1,167 @@
-# Running the AgentTorch MCP Server
+# AgentTorch UI Implementation Guide
 
-This guide explains how to run the AgentTorch MCP server both locally and with Claude Desktop integration using Docker.
+This guide explains how to set up and run the Grok-inspired UI for the AgentTorch simulation framework.
 
-## Option 1: Running Locally with Docker
+## Overview
 
-### Prerequisites
-- Docker installed on your machine
-- Docker Compose installed on your machine
-- Git installed on your machine
+I've created a clean, modern UI inspired by Grok that integrates with your existing AgentTorch MCP server. The interface includes:
 
-### Step 1: Clone the Repository
+1. A chat-like conversation interface
+2. Expandable text input for prompts
+3. Real-time simulation logs and progress tracking
+4. Interactive population dynamics visualization
+5. A dark/light theme toggle
+6. Tool selection for different types of simulation actions
+
+## Files Structure
+
+- `index.html` - The main HTML file with the UI structure
+- `styles.css` - CSS styles for the UI (with dark/light theme support)
+- `app.js` - JavaScript code for WebSocket communication and UI interactions
+- `server-py-modifications.py` - Additional code to add to your server.py file
+
+## Implementation Steps
+
+### 1. Add the UI Files
+
+Place the `index.html`, `styles.css`, and `app.js` files in a `ui` directory within your project root:
+
+```
+project_root/
+├── ui/
+│   ├── index.html
+│   ├── styles.css
+│   └── app.js
+├── server.py
+├── config.yaml
+└── ...
+```
+
+### 2. Modify server.py
+
+Add the WebSocket server functionality by appending the code from `server-py-modifications.py` to your existing `server.py` file. This adds:
+
+- A WebSocket server that runs alongside your MCP server
+- Handlers for simulation, analysis, and conversation requests
+- Real-time progress reporting for simulations
+- Data conversion for Chart.js visualization
+
+### 3. Update Docker Configuration
+
+Ensure your Docker setup serves the UI files and exposes the WebSocket port:
+
+1. Update your `Dockerfile` to include:
+   ```dockerfile
+   # Copy UI files
+   COPY ui/ /app/ui/
+   
+   # Expose WebSocket port
+   EXPOSE 8765
+   ```
+
+2. Update your `docker-compose.yaml` to:
+   ```yaml
+   ports:
+     - "8765:8765"  # WebSocket port
+   ```
+
+### 4. Run the Server
+
+Run your server with WebSocket support:
+
 ```bash
-git clone https://github.com/AgentTorch/mcp-server
-cd mcp-server
+python server.py websocket
 ```
 
-### Step 2: Set Up Environment Files
-Create an `.env` file in the project root with your Anthropic API key:
+Or using Docker:
+
 ```bash
-# Create .env file
-cat > .env << 'EOL'
-ANTHROPIC_API_KEY=api_key
-PYTHONPATH=/app
-AGENTTORCH_CONFIG_PATH=/app/config.yaml
-EOL
+docker-compose up
 ```
 
-### Step 3: Launch with Docker Compose
+## Connecting to Claude Desktop
+
+You can still use your MCP server with Claude Desktop by running:
+
 ```bash
-# Start the containers
-docker-compose up -d
-
-# Check if the containers are running
-docker-compose ps
-
-# View logs
-docker-compose logs -f
+mcp install server.py
 ```
 
-### Step 4: Access the Web UI
-Open your browser and go to:
-```
-http://localhost:8080
-```
+The WebSocket server is specifically for the web UI integration and doesn't affect the MCP protocol compatibility.
 
-### Step 5: Run the MCP Server Locally
-You can interact with the containerized MCP server using the following command:
-```bash
-# Execute the server directly in the container
-docker exec -it agenttorch-mcp mcp run server.py
-```
+## UI Features
 
-## Option 2: Claude Desktop Integration
+### Chat Interface
 
-### Step 1: Create Required Files
-Ensure you've completed Steps 1-3 from Option 1 above to get the Docker container running.
+The UI provides a chat-like interface similar to Grok, with:
+- User messages (right-aligned, blue)
+- Assistant responses (left-aligned, dark background)
+- System messages (center-aligned, gray)
 
-### Step 2: Configure Claude Desktop
-Create or update Claude Desktop configuration:
+### Tool Selection
 
-1. Locate your Claude Desktop configuration directory:
-   - macOS: `~/.claude-desktop/`
-   - Windows: `%APPDATA%\claude-desktop\`
-   - Linux: `~/.config/claude-desktop/`
+Users can select different tools using the toolbar buttons:
+- Chat (general conversation)
+- Run Simulation (run predator-prey simulation)
+- Update Config (modify simulation parameters)
+- Analyze Results (analyze simulation outcomes)
 
-2. Create or edit the config.json file:
-```bash
-# For macOS/Linux
-mkdir -p ~/.claude-desktop
-cat > ~/.claude-desktop/config.json << 'EOL'
-{
-  "mcpServers": {
-    "AgentTorch Simulator": {
-      "command": "docker",
-      "args": [
-        "exec",
-        "-i",
-        "agenttorch-mcp",
-        "mcp",
-        "run",
-        "server.py"
-      ]
-    }
-  }
-}
-EOL
+### Sample Prompts
 
-# For Windows (using PowerShell)
-# New-Item -Path "$env:APPDATA\claude-desktop" -ItemType Directory -Force
-# Set-Content -Path "$env:APPDATA\claude-desktop\config.json" -Value '{
-#   "mcpServers": {
-#     "AgentTorch Simulator": {
-#       "command": "docker",
-#       "args": [
-#         "exec",
-#         "-it",
-#         "agenttorch-mcp",
-#         "mcp",
-#         "run",
-#         "server.py"
-#       ]
-#     }
-#   }
-# }'
-```
+The UI includes a sample prompts section with common simulation queries for users to select:
+- "What happens to prey population when predators increase?"
+- "How does food availability affect the ecosystem balance?"
+- "What emergent behaviors appear in predator-prey systems?"
+- And more...
 
-### Step 3: Launch Claude Desktop
-1. Open Claude Desktop
-2. You should see "AgentTorch Simulator" in the server selection dropdown
-3. Select it to connect to your Docker container
+### Side Panel
 
-### Step 4: Test Integration
-1. Start a new conversation in Claude Desktop
-2. Select one of the available prompts (e.g., "Run Simulation")
-3. Enter a query like "Run a simulation with 500 predators and 1000 prey"
-4. Check both Claude Desktop and the web UI (http://localhost:8080) for results
+The side panel shows:
+- Current simulation status and progress
+- Real-time simulation logs
+- Population dynamics chart
+
+### Theme Toggle
+
+Users can switch between dark and light themes using the toggle button in the header.
+
+## Customization
+
+### Adding More Tools
+
+To add more tools:
+
+1. Add a new button in the `tools-selector` div in `index.html`
+2. Add a handler function in `server-py-modifications.py`
+3. Update the tool handling logic in `app.js`
+
+### Changing Chart Appearance
+
+Modify the chart options in the `createPopulationChart` function in `app.js` to customize the appearance of the population dynamics chart.
+
+### Sample Prompts
+
+Update the sample prompts in the `sample-prompts` div in `index.html` to show different example queries.
 
 ## Troubleshooting
 
-### Docker Issues
-```bash
-# Restart the container
-docker-compose restart
+### WebSocket Connection Issues
 
-# Rebuild the container (if you made changes)
-docker-compose down
-docker-compose up -d --build
+If the WebSocket connection fails:
+1. Check that port 8765 is exposed and accessible
+2. Verify the WebSocket server is running alongside the MCP server
+3. Look for error messages in the server logs
 
-# Check container logs
-docker-compose logs -f
-```
+### Chart Display Problems
 
-### Claude Desktop Connection Issues
-1. Verify Docker container is running:
-   ```bash
-   docker ps | grep agenttorch-mcp
-   ```
+If the chart doesn't display properly:
+1. Check the console for JavaScript errors
+2. Verify the simulation results contain the expected data format
+3. Test with a smaller dataset first
 
-2. Check if the container can execute MCP commands:
-   ```bash
-   docker exec -it agenttorch-mcp mcp list
-   ```
+### UI Rendering Issues
 
-3. Restart Claude Desktop
-
-### Web UI Issues
-1. Check if the HTTP server is running:
-   ```bash
-   docker exec -it agenttorch-mcp curl http://localhost:8080
-   ```
-
-2. Check port mappings:
-   ```bash
-   docker-compose ps
-   ```
-
-## Container Management Commands
-
-```bash
-# Stop the container
-docker-compose stop
-
-# Start the container
-docker-compose start
-
-# Remove the container (keeps your data)
-docker-compose down
-
-# Remove the container and volumes (deletes your data)
-docker-compose down -v
-
-# View container resource usage
-docker stats
-```
+If the UI doesn't render correctly:
+1. Clear your browser cache
+2. Try a different browser
+3. Check for CSS conflicts with browser extensions

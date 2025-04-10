@@ -13,7 +13,6 @@ from pathlib import Path
 from dataclasses import dataclass
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
-from starlette.websockets import WebSocketDisconnect
 
 # Configure minimal logging to avoid interference with Claude Desktop UI
 logging.basicConfig(
@@ -965,119 +964,94 @@ Ready to explore Antarctic ecosystem dynamics? Let me know and I'll run the simu
 
 # ===== WEBSOCKET SERVER IMPLEMENTATION =====
 
-# In your websocket_handler function, update this section:
-# Add these imports at the top
-import asyncio
-from starlette.websockets import WebSocketDisconnect
-import websockets
+# WebSocket handler
+from starlette.websockets import WebSocketDisconnect  # Add this import
 
-# Create a helper function for safe message sending
-async def safe_send(websocket, message_dict):
-    """Safely send a message through WebSocket with error handling."""
-    try:
-        # Make sure all values in the dictionary are serializable
-        for key, value in message_dict.items():
-            if not isinstance(value, (str, int, float, bool, list, dict, type(None))):
-                message_dict[key] = str(value)
-                
-        # Ensure analysis field is always a string if present
-        if 'analysis' in message_dict and not isinstance(message_dict['analysis'], str):
-            message_dict['analysis'] = str(message_dict['analysis'])
-            
-        # Serialize to JSON and send
-        message_text = json.dumps(message_dict)
-        await websocket.send_text(message_text)
-        websocket_logger.info(f"Sent message type: {message_dict.get('type')}")
-        return True
-    except Exception as e:
-        websocket_logger.error(f"Error sending WebSocket message: {e}")
-        websocket_logger.error(traceback.format_exc())
-        # Try to send a simple error message
-        try:
-            await websocket.send_text(json.dumps({
-                "type": "error",
-                "message": f"Server error: {str(e)}"
-            }))
-        except:
-            pass
-        return False
-
-# Replace your websocket_handler with this:
 async def websocket_handler(websocket):
-    """Handle WebSocket connections and messages with proper lifecycle management."""
+    """Handle WebSocket connections and messages with Starlette's API."""
     try:
-        # CRITICAL: Must accept the connection first
+        # First, accept the WebSocket connection
         await websocket.accept()
-        websocket_logger.info("WebSocket connection accepted")
         
-        # Add to active connections
+        # Register new connection
         active_connections.add(websocket)
         
-        # Send connection established message
-        await safe_send(websocket, {
+        # Get client info safely
+        client_info = "Unknown client"
+        if hasattr(websocket, 'client'):
+            client_info = websocket.client
+        
+        websocket_logger.info(f"New WebSocket connection: {client_info}")
+        
+        # Send initial connection message
+        await websocket.send_text(json.dumps({
             "type": "connection_established",
             "message": "Connected to AgentTorch simulation server"
-        })
+        }))
         
-        # Message handling loop
+        # Handle messages using Starlette's receive/send pattern
         while True:
             try:
-                # Wait for a message
+                # Receive message - Starlette uses receive_text() instead of async for
                 message = await websocket.receive_text()
-                websocket_logger.info(f"Received message: {message[:100]}...")
+                websocket_logger.info(f"Received message: {message}")
                 
-                # Parse JSON message
-                data = json.loads(message)
-                command = data.get("command", "")
-                prompt = data.get("prompt", "")
+                # Parse message
+                try:
+                    data = json.loads(message)
+                    
+                    # Process based on command
+                    command = data.get("command", "")
+                    prompt = data.get("prompt", "")
+                    
+                    if command == "run_simulation":
+                        # Run a simulation
+                        await handle_run_simulation(websocket, prompt)
+                        
+                    elif command == "analyze_simulation" or command == "analyze":
+                        # Analyze simulation results
+                        await handle_analyze_simulation(websocket, data)
+                        
+                    elif command == "update_config":
+                        # Update simulation configuration
+                        await handle_update_config(websocket, prompt)
+                        
+                    elif command == "chat":
+                        # Process general conversation
+                        await handle_general_conversation(websocket, prompt)
+                    
+                    else:
+                        # Unknown command, default to conversation
+                        websocket_logger.warning(f"Unknown command: {command}, defaulting to conversation")
+                        await handle_general_conversation(websocket, prompt)
                 
-                # Log the command being processed
-                websocket_logger.info(f"Processing command: {command}")
-                
-                # Route command to appropriate handler
-                if command == "update_config":
-                    await handle_update_config(websocket, prompt)
-                    
-                elif command == "run_simulation":
-                    await handle_run_simulation(websocket, prompt)
-                    
-                elif command == "analyze_simulation" or command == "analyze":
-                    await handle_analyze_simulation(websocket, data)
-                    
-                elif command == "chat":
-                    await handle_general_conversation(websocket, prompt)
-                    
-                else:
-                    websocket_logger.warning(f"Unknown command: {command}, using default handler")
-                    await handle_general_conversation(websocket, prompt)
-                    
+                except json.JSONDecodeError:
+                    websocket_logger.error(f"Invalid JSON: {message}")
+                    await websocket.send_text(json.dumps({
+                        "type": "error",
+                        "message": "Invalid JSON message"
+                    }))
+            
             except WebSocketDisconnect:
-                websocket_logger.info("WebSocket disconnected")
+                # Properly handle Starlette's WebSocketDisconnect exception
+                websocket_logger.info("WebSocket disconnected by client")
                 break
                 
-            except json.JSONDecodeError as e:
-                websocket_logger.error(f"Invalid JSON message: {e}")
-                await safe_send(websocket, {
-                    "type": "error",
-                    "message": "Invalid message format"
-                })
-                
             except Exception as e:
-                websocket_logger.error(f"Error processing message: {e}")
+                websocket_logger.error(f"Error receiving message: {e}")
                 websocket_logger.error(traceback.format_exc())
-                await safe_send(websocket, {
-                    "type": "error",
-                    "message": f"Error processing request: {str(e)}"
-                })
+                # Break on any error to be safe
+                break
                 
     except Exception as e:
         websocket_logger.error(f"WebSocket error: {str(e)}")
         websocket_logger.error(traceback.format_exc())
-        
     finally:
-        # Cleanup
+        # Unregister connection
         if websocket in active_connections:
             active_connections.remove(websocket)
+        
+        # No need to explicitly close - just log completion
         websocket_logger.info("WebSocket handler completed")
 
 async def handle_run_simulation(websocket, prompt: str):
@@ -1099,11 +1073,11 @@ async def handle_run_simulation(websocket, prompt: str):
     
     try:
         # Send initial status
-        await safe_send(websocket, {
+        await websocket.send_text(json.dumps({
             "type": "simulation_log",
             "log": "Starting simulation...",
             "progress": 0
-        })
+        }))
         
         # Run the simulation using the global service
         stats, logs = await simulation_service.run_simulation(reload_config=True)
@@ -1116,65 +1090,33 @@ async def handle_run_simulation(websocket, prompt: str):
         total_logs = len(logs)
         for idx, log in enumerate(logs):
             progress = min(int((idx / total_logs) * 90), 90)
-            await safe_send(websocket, {
+            await websocket.send_text(json.dumps({
                 "type": "simulation_log",
                 "log": log,
                 "progress": progress
-            })
+            }))
             await asyncio.sleep(0.05)  # Small delay for better progress visualization
         
         # Create chart data from stats
         chart_data = create_chart_data_from_stats(stats)
         
-        # First, send completion message to update progress indicators
-        await safe_send(websocket, {
+        # Send completion message
+        await websocket.send_text(json.dumps({
             "type": "simulation_complete",
             "message": "Simulation completed successfully",
-            "progress": 100
-        })
-        
-        # Generate analysis using LLM service
-        try:
-            analysis = await llm_service.generate_simulation_response(
-                message=prompt,
-                results=stats,
-                logs=logs
-            )
-            
-            # Send analysis and chart data as a separate message
-            await safe_send(websocket, {
-                "type": "analysis_result",
-                "analysis": analysis,
-                "chartData": chart_data  # Include the chart data here
-            })
-            
-        except Exception as e:
-            websocket_logger.error(f"Error generating analysis: {e}")
-            websocket_logger.error(traceback.format_exc())
-            
-            # Still send the chart data even if analysis fails
-            await safe_send(websocket, {
-                "type": "analysis_result",
-                "analysis": f"The simulation completed successfully, but I encountered an issue generating the analysis: {str(e)}",
-                "chartData": chart_data
-            })
+            "progress": 100,
+            "stats": stats,
+            "chartData": chart_data
+        }))
         
     except Exception as e:
         websocket_logger.error(f"Error running simulation: {e}")
         websocket_logger.error(traceback.format_exc())
-        
-        # Send error message
-        await safe_send(websocket, {
+        await websocket.send_text(json.dumps({
             "type": "error",
             "message": f"Error running simulation: {str(e)}"
-        })
-        
-        # Also send simulation complete to unblock UI
-        await safe_send(websocket, {
-            "type": "simulation_complete",
-            "message": "Simulation failed",
-            "progress": 100
-        })
+        }))
+
 
 async def handle_analyze_simulation(websocket, data: Dict[str, Any]):
     """
@@ -1191,478 +1133,65 @@ async def handle_analyze_simulation(websocket, data: Dict[str, Any]):
     websocket_logger.info(f"Analyzing simulation results with prompt: {prompt}")
     
     try:
-        # Send status message that analysis is starting
-        await safe_send(websocket, {
-            "type": "simulation_log",
-            "log": "Starting analysis of simulation results...",
-            "progress": 95
-        })
-        
-        # Create chart data from the simulation results
-        chart_data = create_chart_data_from_stats(results)
-        
         # Generate analysis using LLM service
         analysis = await llm_service.generate_simulation_response(
             message=prompt,
             results=results,
             logs=logs
         )
-
-        websocket_logger.info(f"Analysis type: {type(analysis)}")
-        websocket_logger.info(f"Analysis preview: {analysis[:100] if isinstance(analysis, str) else 'Not a string'}")
-
-        # Make sure analysis is a string
-        if not isinstance(analysis, str):
-            analysis = str(analysis)
         
-        # Send analysis with chart data to client
-        await safe_send(websocket, {
+        # Send analysis to client
+        await websocket.send_text(json.dumps({
             "type": "analysis_result",
-            "analysis": analysis,
-            "chartData": chart_data
-        })
+            "analysis": analysis
+        }))
         
     except Exception as e:
         websocket_logger.error(f"Error analyzing simulation: {e}")
         websocket_logger.error(traceback.format_exc())
-        
-        # Try to send at least the chart data even if analysis fails
-        try:
-            chart_data = create_chart_data_from_stats(results)
-            await safe_send(websocket, {
-                "type": "analysis_result",
-                "analysis": f"I encountered an issue analyzing the simulation results: {str(e)}. However, I can still show you the population trends from the data.",
-                "chartData": chart_data
-            })
-        except Exception as chart_error:
-            # If even chart creation fails, send just the error
-            websocket_logger.error(f"Error creating chart: {chart_error}")
-            await safe_send(websocket, {
-                "type": "error",
-                "message": f"Error analyzing simulation: {str(e)}"
-            })
+        await websocket.send_text(json.dumps({
+            "type": "error",
+            "message": f"Error analyzing simulation: {str(e)}"
+        }))
+
 
 async def handle_update_config(websocket, prompt: str):
-    """Handle request to update simulation config with the exact required configuration."""
-    websocket_logger.info(f"Updating configuration with exact template")
+    """
+    Handle a request to update the simulation configuration.
+    
+    Args:
+        websocket: The WebSocket connection
+        prompt: The user's prompt
+    """
+    websocket_logger.info(f"Updating configuration with prompt: {prompt}")
     
     try:
-        # Define the exact config path to update
-        config_path = find_config_file()
+        # We'll create a fake Context for use with the update_simulation_config function
+        class FakeContext:
+            def info(self, message):
+                pass
+                
+            def report_progress(self, current, total):
+                pass
         
-        # Create a backup of the original config
-        backup_path = config_path + ".backup"
-        if os.path.exists(config_path):
-            shutil.copy2(config_path, backup_path)
-            websocket_logger.info(f"Created backup of config at {backup_path}")
+        # Call the MCP tool function
+        fake_ctx = FakeContext()
+        result = await update_simulation_config(prompt, fake_ctx)
         
-        # Write the exact configuration needed
-        config_content = """# config_vmap.yaml
-# Configuration for the predator-prey model with vectorized substeps.
-
-simulation_metadata:
-  device: 'cpu'
-  num_episodes: 3
-  num_steps_per_episode: 20
-  num_substeps_per_step: 4
-  calibration: false
-  visualize: false
-
-  max_x: 18
-  max_y: 25
-  num_predators: 40
-  num_prey: 80
-  num_grass: 450
-
-  predator_coords_file: 'data/18x25/predator-coords.csv'
-  prey_coords_file: 'data/18x25/prey-coords.csv'
-  grass_coords_file: 'data/18x25/grass-coords.csv'
-  grass_growth_stage_file: 'data/18x25/growth-stage.csv'
-  grass_growth_countdown_file: 'data/18x25/growth-countdown.csv'
-
-state:
-  environment:
-    bounds:
-      name: 'Bounds'
-      learnable: false
-      shape: 2
-      dtype: 'int'
-      value:
-        - ${simulation_metadata.max_x}
-        - ${simulation_metadata.max_y}
-      initialization_function: null
-
-  agents:
-    predator:
-      number: ${simulation_metadata.num_predators}
-      properties:
-        coordinates:
-          name: 'Position'
-          learnable: false
-          shape:
-            - ${state.agents.predator.number}
-            - 2
-          dtype: 'int'
-          initialization_function:
-            generator: 'read_from_file'
-            arguments:
-              file_path:
-                name: 'Predator Coordinates File'
-                learnable: false
-                shape: null
-                value: ${simulation_metadata.predator_coords_file}
-                initialization_function: null
-        energy:
-          name: 'Energy'
-          learnable: false
-          shape:
-            - ${state.agents.predator.number}
-            - 1
-          dtype: 'float'
-          initialization_function:
-            generator: 'random_float'
-            arguments:
-              lower_limit:
-                name: 'Lower Bound'
-                learnable: false
-                shape:
-                  - 1
-                value: 30
-                initialization_function: null
-              upper_limit:
-                name: 'Upper Bound'
-                learnable: false
-                shape:
-                  - 1
-                value: 100
-                initialization_function: null
-        stride_work:
-          name: 'Energy Lost in Taking One Step'
-          learnable: true
-          shape:
-            - 1
-          dtype: 'float'
-          value: 1
-          initialization_function: null
-    prey:
-      number: ${simulation_metadata.num_prey}
-      properties:
-        coordinates:
-          name: 'Position'
-          learnable: false
-          shape:
-            - ${state.agents.prey.number}
-            - 2
-          dtype: 'int'
-          initialization_function:
-            generator: 'read_from_file'
-            arguments:
-              file_path:
-                name: 'Prey Coordinates File'
-                learnable: false
-                shape: null
-                value: ${simulation_metadata.prey_coords_file}
-                initialization_function: null
-        energy:
-          name: 'Energy'
-          learnable: false
-          shape:
-            - ${state.agents.prey.number}
-            - 1
-          dtype: 'float'
-          initialization_function:
-            generator: 'random_float'
-            arguments:
-              lower_limit:
-                name: 'Lower Bound'
-                learnable: false
-                shape:
-                  - 1
-                value: 40
-                initialization_function: null
-              upper_limit:
-                name: 'Upper Bound'
-                learnable: false
-                shape:
-                  - 1
-                value: 100
-                initialization_function: null
-        stride_work:
-          name: 'Energy Lost in Taking One Step'
-          learnable: true
-          shape:
-            - 1
-          dtype: 'float'
-          value: 5
-          initialization_function: null
-        nutritional_value:
-          name: 'Energy Gained Upon Consuming Prey'
-          learnable: true
-          shape:
-            - 1
-          dtype: 'float'
-          value: 20
-          initialization_function: null
-
-  objects:
-    grass:
-      number: ${simulation_metadata.num_grass}
-      properties:
-        coordinates:
-          name: 'Position'
-          learnable: false
-          shape:
-            - ${state.objects.grass.number}
-            - 2
-          dtype: 'int'
-          initialization_function:
-            generator: 'read_from_file'
-            arguments:
-              file_path:
-                name: 'Grass Coordinates File'
-                learnable: false
-                shape: null
-                value: ${simulation_metadata.grass_coords_file}
-                initialization_function: null
-        growth_stage:
-          name: 'The Grass Growth Stage'
-          learnable: false
-          shape:
-            - ${state.objects.grass.number}
-            - 1
-          dtype: 'int'
-          initialization_function:
-            generator: 'read_from_file'
-            arguments:
-              file_path:
-                name: 'Grass Growth Stage File'
-                learnable: false
-                shape: null
-                value: ${simulation_metadata.grass_growth_stage_file}
-                initialization_function: null
-        regrowth_time:
-          name: 'Time for Grass to Regrow Completely'
-          learnable: true
-          shape:
-            - 1
-          dtype: 'float'
-          value: 100 # steps
-          initialization_function: null
-        growth_countdown:
-          name: 'Time for Grass to Grow Fully'
-          learnable: false
-          shape:
-            - ${state.objects.grass.number}
-            - 1
-          dtype: 'float'
-          initialization_function:
-            generator: 'read_from_file'
-            arguments:
-              file_path:
-                name: 'Grass Growth Countdown File'
-                learnable: false
-                shape: null
-                value: ${simulation_metadata.grass_growth_countdown_file}
-                initialization_function: null
-        nutritional_value:
-          name: 'Energy Gained Upon Consuming Grass at Max Growth Stage'
-          learnable: true
-          shape:
-            - 1
-          dtype: 'float'
-          value: 7
-          initialization_function: null
-
-  network:
-    agent_agent:
-      predator_prey:
-        type: 'map'
-        arguments: null
-
-substeps:
-  '0':
-    name: 'Move'
-    description: 'Moving'
-    active_agents:
-      - 'predator'
-      - 'prey'
-    observation:
-      predator:
-        find_neighbors:
-          generator: 'FindNeighborsVmap'
-          arguments: null
-          input_variables:
-            bounds: 'environment/bounds'
-            adj_grid: 'network/agent_agent/predator_prey/adjacency_matrix'
-            positions: 'agents/predator/coordinates'
-          output_variables:
-            - possible_neighbors
-      prey:
-        find_neighbors:
-          generator: 'FindNeighborsVmap'
-          arguments: null
-          input_variables:
-            bounds: 'environment/bounds'
-            adj_grid: 'network/agent_agent/predator_prey/adjacency_matrix'
-            positions: 'agents/prey/coordinates'
-          output_variables:
-            - possible_neighbors
-    policy:
-      predator:
-        decide_movement:
-          generator: 'DecideMovementVmap'
-          arguments: null
-          input_variables:
-            positions: 'agents/predator/coordinates'
-            energy: 'agents/predator/energy'
-          output_variables:
-            - next_positions
-      prey:
-        decide_movement:
-          generator: 'DecideMovementVmap'
-          arguments: null
-          input_variables:
-            positions: 'agents/prey/coordinates'
-            energy: 'agents/prey/energy'
-          output_variables:
-            - next_positions
-    transition:
-      update_positions:
-        generator: 'UpdatePositionsVmap'
-        arguments: null
-        input_variables:
-          prey_pos: 'agents/prey/coordinates'
-          prey_energy: 'agents/prey/energy'
-          pred_pos: 'agents/predator/coordinates'
-          pred_energy: 'agents/predator/energy'
-          prey_work: 'agents/prey/stride_work'
-          pred_work: 'agents/predator/stride_work'
-        output_variables:
-          - prey_pos
-          - prey_energy
-          - pred_pos
-          - pred_energy
-  '1':
-    name: 'Eat'
-    description: 'Eating Grass'
-    active_agents:
-      - 'prey'
-    observation:
-      prey: null
-    policy:
-      prey:
-        find_eatable_grass:
-          generator: 'FindEatableGrassVmap'
-          arguments: null
-          input_variables:
-            bounds: 'environment/bounds'
-            positions: 'agents/prey/coordinates'
-            grass_growth: 'objects/grass/growth_stage'
-          output_variables:
-            - eatable_grass_positions
-    transition:
-      eat_grass:
-        generator: 'EatGrassVmap'
-        arguments: null
-        input_variables:
-          energy: 'agents/prey/energy'
-          grass_growth: 'objects/grass/growth_stage'
-          growth_countdown: 'objects/grass/growth_countdown'
-          bounds: 'environment/bounds'
-          prey_pos: 'agents/prey/coordinates'
-          nutrition: 'objects/grass/nutritional_value'
-          regrowth_time: 'objects/grass/regrowth_time'
-        output_variables:
-          - energy
-          - grass_growth
-          - growth_countdown
-  '2':
-    name: 'Hunt'
-    description: 'Hunting Prey'
-    active_agents:
-      - 'predator'
-    observation:
-      predator: null
-    policy:
-      predator:
-        find_targets:
-          generator: 'FindTargetsVmap'
-          arguments: null
-          input_variables:
-            prey_pos: 'agents/prey/coordinates'
-            pred_pos: 'agents/predator/coordinates'
-          output_variables:
-            - target_positions
-    transition:
-      hunt_prey:
-        generator: 'HuntPreyVmap'
-        arguments: null
-        input_variables:
-          prey_energy: 'agents/prey/energy'
-          pred_energy: 'agents/predator/energy'
-          nutritional_value: 'agents/prey/nutritional_value'
-          prey_pos: 'agents/prey/coordinates'
-          pred_pos: 'agents/predator/coordinates'
-        output_variables:
-          - prey_energy
-          - pred_energy
-  '3':
-    name: 'Grow'
-    description: 'Grow Grass'
-    active_agents:
-      - 'prey'
-    observation:
-      prey: null
-    policy:
-      prey: null
-    transition:
-      grow_grass:
-        generator: 'GrowGrassVmap'
-        arguments: null
-        input_variables:
-          grass_growth: 'objects/grass/growth_stage'
-          growth_countdown: 'objects/grass/growth_countdown'
-        output_variables:
-          - grass_growth
-          - growth_countdown"""
-          
-        # Write the full config to file
-        with open(config_path, 'w') as f:
-            f.write(config_content)
-        
-        websocket_logger.info(f"Successfully wrote exact configuration to {config_path}")
-        
-        # Also update the temporary config path to be the same
-        temp_config_path = os.path.join(os.path.dirname(config_path), "services", "config.yaml")
-        os.makedirs(os.path.dirname(temp_config_path), exist_ok=True)
-        
-        with open(temp_config_path, 'w') as f:
-            f.write(config_content)
-            
-        websocket_logger.info(f"Also updated temporary config at {temp_config_path}")
-        
-        # Send success response to unblock the UI
-        # After writing the config file, make sure to send a response that the frontend recognizes
-        success_message = """I've successfully updated the Antarctic ecosystem simulation!
-
-        I've added a food regeneration mechanism that allows algae (the primary food source for Emperor Penguins) to regrow over time. This creates a more realistic and sustainable ecosystem model.
-
-        Without this mechanism, food resources would be permanently depleted once consumed. Now, the ecosystem can achieve greater balance between predator and prey populations.
-
-        To see the effects of this change, please select "Run Simulation" from the panel to execute the simulation with food regeneration enabled."""
-
-        await safe_send(websocket, {
-            "type": "analysis_result",  # Note: Using analysis_result instead of config_updated
-            "analysis": success_message  # Use the "analysis" field which your UI already handles
-        })
+        # Send response to client
+        await websocket.send_text(json.dumps({
+            "type": "config_updated",
+            "message": result
+        }))
         
     except Exception as e:
-        websocket_logger.error(f"Error updating config: {e}")
+        websocket_logger.error(f"Error updating configuration: {e}")
         websocket_logger.error(traceback.format_exc())
-        await safe_send(websocket, {
+        await websocket.send_text(json.dumps({
             "type": "error",
             "message": f"Error updating configuration: {str(e)}"
-        })
+        }))
+
 
 async def handle_general_conversation(websocket, prompt: str):
     """
@@ -1909,5 +1438,3 @@ if __name__ == "__main__":
             # Fall back to just MCP if Starlette is not available
             logger.info("Starlette not found, running in MCP mode only")
             mcp.run()
-
-
