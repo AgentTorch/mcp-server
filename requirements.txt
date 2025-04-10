@@ -20,7 +20,7 @@ pandas==2.1.0
 matplotlib==3.7.2
 
 # Visualization
-Pillow==10.0.0
+Pillow==10.3.0
 imageio==2.31.1
 
 # PyTorch with CPU version (smaller image size)
