@@ -165,5 +165,3 @@ If the UI doesn't render correctly:
 1. Clear your browser cache
 2. Try a different browser
 3. Check for CSS conflicts with browser extensions
-
-hi
